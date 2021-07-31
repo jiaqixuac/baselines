@@ -9,6 +9,8 @@ import tempfile
 from collections import defaultdict
 from contextlib import contextmanager
 
+import io  # by jqxu
+
 DEBUG = 10
 INFO = 20
 WARN = 30
@@ -63,6 +65,10 @@ class HumanOutputFormat(KVWriter, SeqWriter):
                 ' ' * (valwidth - len(val)),
             ))
         lines.append(dashes)
+        if self.file.closed and isinstance(self.file, io.TextIOWrapper):
+            # by jqxu
+            print('\n*** Warning [writekvs], self.file closed ***\n')
+            self.file = sys.stdout
         self.file.write('\n'.join(lines) + '\n')
 
         # Flush the output to the file
@@ -74,6 +80,10 @@ class HumanOutputFormat(KVWriter, SeqWriter):
 
     def writeseq(self, seq):
         seq = list(seq)
+        if self.file.closed and isinstance(self.file, io.TextIOWrapper):
+            # by jqxu
+            print('\n*** Warning [writeseq], self.file closed ***\n')
+            self.file = sys.stdout
         for (i, elem) in enumerate(seq):
             self.file.write(elem)
             if i < len(seq) - 1: # add space unless this is the last one

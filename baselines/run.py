@@ -1,6 +1,7 @@
 import sys
 import re
 import multiprocessing
+import os  # by jqxu
 import os.path as osp
 import gym
 from collections import defaultdict
@@ -52,7 +53,10 @@ _game_envs['retro'] = {
 
 def train(args, extra_args):
     env_type, env_id = get_env_type(args)
+    print()
+    print('env_id: {}'.format(env_id))  # by jqxu
     print('env_type: {}'.format(env_type))
+    print()
 
     total_timesteps = int(args.num_timesteps)
     seed = args.seed
@@ -70,6 +74,13 @@ def train(args, extra_args):
     else:
         if alg_kwargs.get('network') is None:
             alg_kwargs['network'] = get_default_network(env_type)
+    if args.save_path:
+        # by jqxu
+        alg_kwargs['save_path'] = osp.expanduser(args.save_path)
+        os.makedirs(alg_kwargs['save_path'], exist_ok=True)
+    if 'load_path' in alg_kwargs:
+        # by jqxu
+        alg_kwargs['load_path'] = osp.expanduser(alg_kwargs['load_path'])
 
     print('Training {} on {}:{} with arguments \n{}'.format(args.alg, env_type, env_id, alg_kwargs))
 
@@ -217,10 +228,13 @@ def main(args):
 
     if args.save_path is not None and rank == 0:
         save_path = osp.expanduser(args.save_path)
+        save_path = osp.join(save_path, 'policy_last.ckt')  # by jqxu
         model.save(save_path)
+        logger.info("\nSaved model at {}.\n".format(save_path))  # by jqxu
 
     if args.play:
         logger.log("Running trained model")
+        num_succeed, num_total = 0, 0  # by jqxu
         obs = env.reset()
 
         state = model.initial_state if hasattr(model, 'initial_state') else None
@@ -233,14 +247,19 @@ def main(args):
             else:
                 actions, _, _, _ = model.step(obs)
 
-            obs, rew, done, _ = env.step(actions)
+            obs, rew, done, info = env.step(actions)  # by jqxu
             episode_rew += rew
-            env.render()
+            # env.render()  # bug when SurRoL rgb_array render_mode
             done_any = done.any() if isinstance(done, np.ndarray) else done
             if done_any:
                 for i in np.nonzero(done)[0]:
                     print('episode_rew={}'.format(episode_rew[i]))
                     episode_rew[i] = 0
+                    if isinstance(obs, dict):
+                        # by jqxu
+                        num_total += 1
+                        num_succeed += info[i]['is_success']
+                        print(" -> succeed/total: {}/{}, {:.4f}".format(num_succeed, num_total, num_succeed/num_total))
 
     env.close()
 

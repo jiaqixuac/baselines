@@ -237,11 +237,18 @@ def default_split_fn(r):
     if match:
         return match.group(0)
 
+
+def default_sort_fn(x):
+    # by jqxu
+    return x
+
 def plot_results(
     allresults, *,
     xy_fn=default_xy_fn,
     split_fn=default_split_fn,
     group_fn=default_split_fn,
+    sort_fn=default_sort_fn,  # by jqxu
+    color_fn=None,  # by jqxu
     average_group=False,
     shaded_std=True,
     shaded_err=True,
@@ -251,7 +258,10 @@ def plot_results(
     smooth_step=1.0,
     tiling='vertical',
     xlabel=None,
-    ylabel=None
+    ylabel=None,
+    xlim=None,  # by jqxu
+    ylim=None,  # by jqxu
+    title=None,
 ):
     '''
     Plot multiple Results objects
@@ -347,14 +357,19 @@ def plot_results(
             else:
                 if resample:
                     x, y, counts = symmetric_ema(x, y, x[0], x[-1], resample, decay_steps=smooth_step)
-                l, = ax.plot(x, y, color=COLORS[groups.index(group) % len(COLORS)])
+                    l, = ax.plot(x, y, color=COLORS[groups.index(group) % len(COLORS)])  # by jqxu
                 g2l[group] = l
         if average_group:
-            for group in sorted(groups):
+            for group in sorted(groups, key=lambda group: sort_fn(group)):
+                # by jqxu
                 xys = gresults[group]
                 if not any(xys):
                     continue
-                color = COLORS[groups.index(group) % len(COLORS)]
+                if color_fn is None:
+                    # by jqxu
+                    color = COLORS[groups.index(group) % len(COLORS)]
+                else:
+                    color = color_fn(group)
                 origxs = [xy[0] for xy in xys]
                 minxlen = min(map(len, origxs))
                 def allequal(qs):
@@ -373,13 +388,18 @@ def plot_results(
                     ys = [xy[1][:minxlen] for xy in xys]
                 ymean = np.mean(ys, axis=0)
                 ystd = np.std(ys, axis=0)
-                ystderr = ystd / np.sqrt(len(ys))
+                ystderr = ystd / np.sqrt(len(ys))  # by jqxu; for success rate
                 l, = axarr[idx_row][idx_col].plot(usex, ymean, color=color)
                 g2l[group] = l
                 if shaded_err:
                     ax.fill_between(usex, ymean - ystderr, ymean + ystderr, color=color, alpha=.4)
                 if shaded_std:
                     ax.fill_between(usex, ymean - ystd,    ymean + ystd,    color=color, alpha=.2)
+        if xlim is not None:
+            # by jqxu
+            ax.set_xlim(xlim[0], xlim[1])
+        if ylim is not None:
+            ax.set_ylim(ylim[0], ylim[1])
 
 
         # https://matplotlib.org/users/legend_guide.html
@@ -387,10 +407,11 @@ def plot_results(
         if any(g2l.keys()):
             ax.legend(
                 g2l.values(),
-                ['%s (%i)'%(g, g2c[g]) for g in g2l] if average_group else g2l.keys(),
+                # ['%s (%i)'%(g, g2c[g]) for g in g2l] if average_group else g2l.keys(),
+                ['%s' % g for g in g2l] if average_group else g2l.keys(),  # by jqxu
                 loc=2 if legend_outside else None,
                 bbox_to_anchor=(1,1) if legend_outside else None)
-        ax.set_title(sk)
+        ax.set_title(sk or title)  # by jqxu
         # add xlabels, but only to the bottom row
         if xlabel is not None:
             for ax in axarr[-1]:

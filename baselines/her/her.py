@@ -25,9 +25,10 @@ def train(*, policy, rollout_worker, evaluator,
     rank = MPI.COMM_WORLD.Get_rank()
 
     if save_path:
-        latest_policy_path = os.path.join(save_path, 'policy_latest.pkl')
-        best_policy_path = os.path.join(save_path, 'policy_best.pkl')
-        periodic_policy_path = os.path.join(save_path, 'policy_{}.pkl')
+        # by jqxu: .pkl -> .ckt
+        latest_policy_path = os.path.join(save_path, 'policy_latest.ckt')
+        best_policy_path = os.path.join(save_path, 'policy_best.ckt')
+        periodic_policy_path = os.path.join(save_path, 'policy_{}.ckt')
 
     logger.info("Training...")
     best_success_rate = -1
@@ -67,12 +68,15 @@ def train(*, policy, rollout_worker, evaluator,
         if rank == 0 and success_rate >= best_success_rate and save_path:
             best_success_rate = success_rate
             logger.info('New best success rate: {}. Saving policy to {} ...'.format(best_success_rate, best_policy_path))
-            evaluator.save_policy(best_policy_path)
-            evaluator.save_policy(latest_policy_path)
+            # evaluator.save_policy(best_policy_path)
+            # evaluator.save_policy(latest_policy_path)
+            policy.save(best_policy_path)  # by jqxu
+            policy.save(latest_policy_path)
         if rank == 0 and policy_save_interval > 0 and epoch % policy_save_interval == 0 and save_path:
             policy_path = periodic_policy_path.format(epoch)
             logger.info('Saving periodic policy to {} ...'.format(policy_path))
-            evaluator.save_policy(policy_path)
+            # evaluator.save_policy(policy_path)
+            policy.save(policy_path)  # by jqxu
 
         # make sure that different threads have different seeds
         local_uniform = np.random.uniform(size=(1,))
@@ -96,7 +100,6 @@ def learn(*, network, env, total_timesteps,
     save_path=None,
     **kwargs
 ):
-
     override_params = override_params or {}
     if MPI is not None:
         rank = MPI.COMM_WORLD.Get_rank()
@@ -141,6 +144,7 @@ def learn(*, network, env, total_timesteps,
     policy = config.configure_ddpg(dims=dims, params=params, clip_return=clip_return)
     if load_path is not None:
         tf_util.load_variables(load_path)
+        logger.info("\nLoaded model at {}.\n".format(load_path))  # by jqxu
 
     rollout_params = {
         'exploit': False,
@@ -163,7 +167,6 @@ def learn(*, network, env, total_timesteps,
         eval_params[name] = params[name]
 
     eval_env = eval_env or env
-
     rollout_worker = RolloutWorker(env, policy, dims, logger, monitor=True, **rollout_params)
     evaluator = RolloutWorker(eval_env, policy, dims, logger, **eval_params)
 

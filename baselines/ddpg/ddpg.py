@@ -57,6 +57,8 @@ def learn(network, env,
     else:
         rank = 0
 
+    # eval_env = eval_env or env  # by jqxu
+
     nb_actions = env.action_space.shape[-1]
     assert (np.abs(env.action_space.low) == env.action_space.high).all()  # we assume symmetric actions.
 
@@ -125,7 +127,9 @@ def learn(network, env,
     epoch_qs = []
     epoch_episodes = 0
     for epoch in range(nb_epochs):
+        success_history, eval_success_history = [], []  # by jqxu
         for cycle in range(nb_epoch_cycles):
+            successes = []  # by jqxu
             # Perform rollouts.
             if nenvs > 1:
                 # if simulating multiple envs in parallel, impossible to reset agent at the end of the episode in each
@@ -156,6 +160,10 @@ def learn(network, env,
 
                 obs = new_obs
 
+                # by jqxu
+                success = np.array([i.get('is_success', 0.0) for i in info])
+                successes.append(success.copy())
+
                 for d in range(len(done)):
                     if done[d]:
                         # Episode done.
@@ -169,7 +177,10 @@ def learn(network, env,
                         if nenvs == 1:
                             agent.reset()
 
-
+            # by jqxu
+            successful = np.array(successes)[-1, :]
+            success_rate = np.mean(successful)
+            success_history.append(success_rate)
 
             # Train.
             epoch_actor_losses = []
@@ -192,6 +203,7 @@ def learn(network, env,
             if eval_env is not None:
                 nenvs_eval = eval_obs.shape[0]
                 eval_episode_reward = np.zeros(nenvs_eval, dtype = np.float32)
+                eval_successes = []  # by jqxu
                 for t_rollout in range(nb_eval_steps):
                     eval_action, eval_q, _, _ = agent.step(eval_obs, apply_noise=False, compute_Q=True)
                     eval_obs, eval_r, eval_done, eval_info = eval_env.step(max_action * eval_action)  # scale for execution in env (as far as DDPG is concerned, every action is in [-1, 1])
@@ -199,12 +211,21 @@ def learn(network, env,
                         eval_env.render()
                     eval_episode_reward += eval_r
 
+                    # by jqxu
+                    eval_success = np.array([i.get('is_success', 0.0) for i in eval_info])
+                    eval_successes.append(eval_success.copy())
+
                     eval_qs.append(eval_q)
                     for d in range(len(eval_done)):
                         if eval_done[d]:
                             eval_episode_rewards.append(eval_episode_reward[d])
                             eval_episode_rewards_history.append(eval_episode_reward[d])
                             eval_episode_reward[d] = 0.0
+
+                # by jqxu
+                eval_successful = np.array(eval_successes)[-1, :]
+                eval_success_rate = np.mean(eval_successful)
+                eval_success_history.append(eval_success_rate)
 
         if MPI is not None:
             mpi_size = MPI.COMM_WORLD.Get_size()
@@ -231,12 +252,14 @@ def learn(network, env,
         combined_stats['total/episodes'] = episodes
         combined_stats['rollout/episodes'] = epoch_episodes
         combined_stats['rollout/actions_std'] = np.std(epoch_actions)
+        combined_stats['rollout/success_rate'] = np.mean(success_history)  # by jqxu
         # Evaluation statistics.
         if eval_env is not None:
             combined_stats['eval/return'] = eval_episode_rewards
             combined_stats['eval/return_history'] = np.mean(eval_episode_rewards_history)
             combined_stats['eval/Q'] = eval_qs
             combined_stats['eval/episodes'] = len(eval_episode_rewards)
+            combined_stats['eval/success_rate'] = np.mean(eval_success_history)  # by jqxu
         def as_scalar(x):
             if isinstance(x, np.ndarray):
                 assert x.size == 1

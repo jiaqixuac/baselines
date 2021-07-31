@@ -11,6 +11,16 @@ DEFAULT_ENV_PARAMS = {
     'FetchReach-v1': {
         'n_cycles': 10,
     },
+    # by jqxu
+    # 'PSMReach-v0': {
+    #     'n_cycles': 10,
+    # },
+    # 'NeedlePlace-v0': {
+    #     'n_cycles': 10,
+    # },
+    # 'BiPSMReach-v0': {
+    #     'n_cycles': 10,
+    # },
 }
 
 

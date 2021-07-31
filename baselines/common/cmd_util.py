@@ -19,6 +19,7 @@ from baselines.common.vec_env.dummy_vec_env import DummyVecEnv
 from baselines.common import retro_wrappers
 from baselines.common.wrappers import ClipActionsWrapper
 
+
 def make_vec_env(env_id, env_type, num_env, seed,
                  wrapper_kwargs=None,
                  env_kwargs=None,
@@ -36,6 +37,7 @@ def make_vec_env(env_id, env_type, num_env, seed,
     mpi_rank = MPI.COMM_WORLD.Get_rank() if MPI else 0
     seed = seed + 10000 * mpi_rank if seed is not None else None
     logger_dir = logger.get_dir()
+
     def make_thunk(rank, initializer=None):
         return lambda: make_env(
             env_id=env_id,
@@ -51,6 +53,7 @@ def make_vec_env(env_id, env_type, num_env, seed,
             logger_dir=logger_dir,
             initializer=initializer
         )
+    logger.log('\n*** Use {} environments ***\n'.format(num_env))  # by jqxu
 
     set_global_seeds(seed)
     if not force_dummy and num_env > 1:
@@ -87,7 +90,6 @@ def make_env(env_id, env_type, mpi_rank=0, subrank=0, seed=None, reward_scale=1.
     env = Monitor(env,
                   logger_dir and os.path.join(logger_dir, str(mpi_rank) + '.' + str(subrank)),
                   allow_early_resets=True)
-
 
     if env_type == 'atari':
         env = wrap_deepmind(env, **wrapper_kwargs)

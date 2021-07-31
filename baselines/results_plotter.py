@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib
+import seaborn as sns; sns.set()  # by jqxu
 matplotlib.use('TkAgg') # Can change to 'Agg' for non-interactive mode
 
 import matplotlib.pyplot as plt
@@ -11,6 +12,7 @@ X_TIMESTEPS = 'timesteps'
 X_EPISODES = 'episodes'
 X_WALLTIME = 'walltime_hrs'
 Y_REWARD = 'reward'
+Y_SCCESS_RATE = 'success_rate'  # by jqxu
 Y_TIMESTEPS = 'timesteps'
 POSSIBLE_X_AXES = [X_TIMESTEPS, X_EPISODES, X_WALLTIME]
 EPISODES_WINDOW = 100
@@ -29,6 +31,7 @@ def window_func(x, y, window, func):
     return x[window-1:], yw_func
 
 def ts2xy(ts, xaxis, yaxis):
+    # ts: pandas.core.frame.DataFrame
     if xaxis == X_TIMESTEPS:
         x = np.cumsum(ts.l.values)
     elif xaxis == X_EPISODES:
@@ -41,6 +44,9 @@ def ts2xy(ts, xaxis, yaxis):
         y = ts.r.values
     elif yaxis == Y_TIMESTEPS:
         y = ts.l.values
+    elif yaxis == Y_SCCESS_RATE:
+        # by jqxu
+        y = ts['test/success_rate'].values
     else:
         raise NotImplementedError
     return x, y
@@ -64,11 +70,14 @@ def plot_curves(xy_list, xaxis, yaxis, title):
 
 
 def split_by_task(taskpath):
-    return taskpath['dirname'].split('/')[-1].split('-')[0]
+    # return taskpath['dirname'].split('/')[-1].split('-')[0]
+    return taskpath.dirname.split('/')[-1].split('-')[0]  # by jqxu
 
 def plot_results(dirs, num_timesteps=10e6, xaxis=X_TIMESTEPS, yaxis=Y_REWARD, title='', split_fn=split_by_task):
     results = plot_util.load_results(dirs)
-    plot_util.plot_results(results, xy_fn=lambda r: ts2xy(r['monitor'], xaxis, yaxis), split_fn=split_fn, average_group=True, resample=int(1e6))
+    # plot_util.plot_results(results, xy_fn=lambda r: ts2xy(r['monitor'], xaxis, yaxis), split_fn=split_fn, average_group=True, resample=int(1e6))
+    plot_util.plot_results(results, xy_fn=lambda r: ts2xy(r.progress, xaxis, yaxis), split_fn=split_by_task,
+                           group_fn=split_by_task, average_group=True, resample=int(512))  # by jqxu
 
 # Example usage in jupyter-notebook
 # from baselines.results_plotter import plot_results

@@ -1,3 +1,4 @@
+# import time  # by jqxu
 from collections import deque
 
 import numpy as np
@@ -51,7 +52,9 @@ class RolloutWorker:
         """Performs `rollout_batch_size` rollouts in parallel for time horizon `T` with the current
         policy acting on it accordingly.
         """
+        # tic = time.time()  # by jqxu
         self.reset_all_rollouts()
+        # print(" -> Reset time: {:.4f}".format(time.time() - tic))  # by jqxu
 
         # compute observations
         o = np.empty((self.rollout_batch_size, self.dims['o']), np.float32)  # observations
@@ -86,7 +89,10 @@ class RolloutWorker:
             ag_new = np.empty((self.rollout_batch_size, self.dims['g']))
             success = np.zeros(self.rollout_batch_size)
             # compute new states and observations
+            # tic = time.time()  # by jqxu
             obs_dict_new, _, done, info = self.venv.step(u)
+            # if t == 0:
+            #     print(" -> step time: {:.4f}".format(time.time() - tic))
             o_new = obs_dict_new['observation']
             ag_new = obs_dict_new['achieved_goal']
             success = np.array([i.get('is_success', 0.0) for i in info])
